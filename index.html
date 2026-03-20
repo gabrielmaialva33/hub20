@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hub 2.0 - Auto Booking ⚡</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+  .container { max-width: 960px; margin: 0 auto; padding: 16px; }
+  h1 { text-align: center; font-size: 1.6em; margin: 16px 0; }
+  h1 span { color: #38bdf8; }
+  .status { text-align: center; padding: 8px 12px; background: #1e293b; border-radius: 8px; margin-bottom: 16px; font-size: 0.9em; }
+  .status.ok { border-left: 4px solid #22c55e; }
+  .status.err { border-left: 4px solid #ef4444; }
+  .tabs { display: flex; gap: 3px; margin-bottom: 0; flex-wrap: wrap; }
+  .tab { padding: 8px 14px; background: #1e293b; border: none; color: #94a3b8; cursor: pointer; border-radius: 8px 8px 0 0; font-size: 0.9em; transition: all 0.2s; }
+  .tab:hover { background: #334155; color: #e2e8f0; }
+  .tab.active { background: #334155; color: #38bdf8; font-weight: 600; }
+  .panel { background: #1e293b; border-radius: 0 8px 8px 8px; padding: 20px; display: none; min-height: 350px; }
+  .panel.active { display: block; }
+  .form-row { display: flex; gap: 10px; margin-bottom: 14px; align-items: end; flex-wrap: wrap; }
+  .form-group { flex: 1; min-width: 140px; }
+  label { display: block; font-size: 0.8em; color: #94a3b8; margin-bottom: 3px; }
+  input, select { padding: 8px 12px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #e2e8f0; font-size: 0.9em; width: 100%; }
+  input:focus, select:focus { outline: none; border-color: #38bdf8; }
+  .btn { padding: 8px 20px; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; font-weight: 600; transition: all 0.2s; white-space: nowrap; }
+  .btn:hover { background: #1d4ed8; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-danger { background: #dc2626; }
+  .btn-danger:hover { background: #b91c1c; }
+  .btn-sniper { background: #059669; font-size: 1.1em; padding: 12px 32px; }
+  .btn-sniper:hover { background: #047857; }
+  .btn-sm { padding: 5px 10px; font-size: 0.8em; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  th { text-align: left; padding: 8px; color: #94a3b8; font-size: 0.8em; border-bottom: 1px solid #334155; }
+  td { padding: 8px; border-bottom: 1px solid #1e293b; font-size: 0.85em; }
+  tr:hover td { background: #334155; }
+  .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.75em; font-weight: 600; }
+  .badge-ok { background: #064e3b; color: #34d399; }
+  .badge-no { background: #7f1d1d; color: #fca5a5; }
+  .badge-fast { background: #7c2d12; color: #fb923c; }
+  #sniper-display { text-align: center; font-size: 5em; font-weight: 700; font-family: 'Courier New', monospace; color: #38bdf8; margin: 20px 0; }
+  #sniper-status { text-align: center; font-size: 1.1em; margin: 8px 0; }
+  .log { background: #0f172a; border-radius: 6px; padding: 10px; font-family: 'Courier New', monospace; font-size: 0.8em; max-height: 250px; overflow-y: auto; margin-top: 12px; }
+  .log-ok { color: #22c55e; }
+  .log-err { color: #ef4444; }
+  .log-info { color: #38bdf8; }
+  .log-warn { color: #f59e0b; }
+  .account-box { background: #0f172a; border-radius: 8px; padding: 14px; margin-bottom: 12px; border: 1px solid #334155; }
+  .account-box h3 { font-size: 0.95em; margin-bottom: 10px; color: #38bdf8; }
+  .help { font-size: 0.8em; color: #64748b; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🏢 Hub 2.0 <span>Auto Booking ⚡</span></h1>
+  <div id="status" class="status">Faça login para começar</div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab(this,'login')">🔐 Login</button>
+    <button class="tab" onclick="showTab(this,'espacos')">📋 Espaços</button>
+    <button class="tab" onclick="showTab(this,'horarios')">🕐 Horários</button>
+    <button class="tab" onclick="showTab(this,'sniper')">🎯 Sniper</button>
+    <button class="tab" onclick="showTab(this,'minhas')">📌 Minhas</button>
+    <button class="tab" onclick="showTab(this,'espiao')">🕵️ Espião</button>
+  </div>
+
+  <!-- LOGIN - Suporte a 2 contas -->
+  <div id="tab-login" class="panel active">
+    <div class="account-box">
+      <h3>👤 Conta Principal (Reserva + Consulta)</h3>
+      <div class="form-row">
+        <div class="form-group"><label>CPF</label><input id="cpf1" value="215.381.638-61"></div>
+        <div class="form-group"><label>Senha</label><input id="senha1" type="password" value="mar230578"></div>
+        <div class="form-group"><label>Condomínio</label><input id="condo1" type="number" value="2078"></div>
+        <div class="form-group"><label>Unidade</label><input id="unid1" value="3 083"></div>
+        <div><label>&nbsp;</label><button class="btn" onclick="doLogin(1)">Login</button></div>
+      </div>
+      <div id="status1" class="help"></div>
+    </div>
+
+    <div class="account-box">
+      <h3>👥 Conta 2 (Consulta / Reserva alternativa)</h3>
+      <div class="form-row">
+        <div class="form-group"><label>CPF</label><input id="cpf2" placeholder="000.000.000-00"></div>
+        <div class="form-group"><label>Senha</label><input id="senha2" type="password" placeholder="senha"></div>
+        <div class="form-group"><label>Condomínio</label><input id="condo2" type="number" value="2078"></div>
+        <div class="form-group"><label>Unidade</label><input id="unid2" placeholder="unidade"></div>
+        <div><label>&nbsp;</label><button class="btn" onclick="doLogin(2)">Login</button></div>
+      </div>
+      <div id="status2" class="help"></div>
+    </div>
+    <p class="help">💡 Use a Conta 2 pra consultar horários quando a Conta 1 tiver reserva ativa bloqueando a consulta.</p>
+  </div>
+
+  <!-- ESPAÇOS -->
+  <div id="tab-espacos" class="panel">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Usar conta</label>
+        <select id="area-account"><option value="1">Conta 1</option><option value="2">Conta 2</option></select>
+      </div>
+      <div><label>&nbsp;</label><button class="btn" onclick="loadAreas()">Carregar Espaços</button></div>
+    </div>
+    <div id="areas-list"></div>
+  </div>
+
+  <!-- HORÁRIOS -->
+  <div id="tab-horarios" class="panel">
+    <div class="form-row">
+      <div class="form-group"><label>Código da Área</label><input id="h-area" type="number" placeholder="17"></div>
+      <div class="form-group"><label>Data</label><input id="h-data" type="date"></div>
+      <div class="form-group">
+        <label>Usar conta</label>
+        <select id="h-account"><option value="1">Conta 1</option><option value="2">Conta 2</option></select>
+      </div>
+      <div><label>&nbsp;</label><button class="btn" onclick="loadSlots()">Ver Horários</button></div>
+    </div>
+    <p class="help">💡 Se a Conta 1 bloquear por "reserva ativa", troque pra Conta 2 pra consultar.</p>
+    <div id="slots-list"></div>
+  </div>
+
+  <!-- SNIPER -->
+  <div id="tab-sniper" class="panel">
+    <div class="form-row">
+      <div class="form-group"><label>Código da Área</label><input id="s-area" type="number" placeholder="17"></div>
+      <div class="form-group"><label>Data da Reserva</label><input id="s-data" type="date"></div>
+      <div class="form-group"><label>Horário (HH:MM)</label><input id="s-hora" placeholder="20:00"></div>
+      <div class="form-group"><label>Disparo (HH:MM)</label><input id="s-disparo" value="00:00"></div>
+      <div class="form-group">
+        <label>Reservar com</label>
+        <select id="s-account"><option value="1">Conta 1</option><option value="2">Conta 2</option></select>
+      </div>
+    </div>
+    <div style="text-align:center; margin: 16px 0;">
+      <button class="btn btn-sniper" id="sniper-btn" onclick="startSniper()">🎯 Ativar Sniper</button>
+      <button class="btn btn-danger" id="sniper-stop" onclick="stopSniper()" style="display:none;font-size:1.1em;padding:12px 32px">⏹️ Parar</button>
+    </div>
+    <div id="sniper-display">--:--:--</div>
+    <div id="sniper-status"></div>
+    <p class="help" style="text-align:center">💡 Reservas abrem à MEIA-NOITE (00:00:00). Configure o disparo pra 00:00.</p>
+    <div id="sniper-log" class="log"></div>
+  </div>
+
+  <!-- MINHAS RESERVAS -->
+  <div id="tab-minhas" class="panel">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Conta</label>
+        <select id="m-account"><option value="1">Conta 1</option><option value="2">Conta 2</option></select>
+      </div>
+      <div><label>&nbsp;</label><button class="btn" onclick="loadMinhas()">Atualizar</button></div>
+    </div>
+    <div id="minhas-list"></div>
+  </div>
+
+  <!-- ESPIÃO -->
+  <div id="tab-espiao" class="panel">
+    <div class="form-row">
+      <div class="form-group"><label>Data para espiar</label><input id="e-data" type="date"></div>
+      <div class="form-group">
+        <label>Filtrar área (opcional)</label>
+        <input id="e-area" placeholder="ex: areia, tenis, churras...">
+      </div>
+      <div class="form-group">
+        <label>Conta</label>
+        <select id="e-account"><option value="1">Conta 1</option><option value="2">Conta 2</option></select>
+      </div>
+      <div><label>&nbsp;</label><button class="btn" onclick="loadEspiao()">🕵️ Espiar</button></div>
+    </div>
+    <p class="help">💡 Mostra quem reservou e QUANDO (com milissegundos). Identifique quem tá usando automação!</p>
+    <div id="espiao-list"></div>
+  </div>
+</div>
+
+<script>
+// Usa proxy local pra evitar CORS
+const API_ACCOUNTS = '/proxy/accounts';
+const API_MORADOR = '/proxy/morador';
+
+// Multi-account support
+const accounts = {
+  1: { token: null, nome: '', condo: 2078, unid: '3 083' },
+  2: { token: null, nome: '', condo: 2078, unid: '' },
+};
+
+let sniperInterval = null;
+
+function setStatus(msg, ok = true) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status ' + (ok ? 'ok' : 'err');
+}
+
+function showTab(btn, name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+async function apiFetch(method, url, body = null, acct = 1) {
+  const headers = { 'Content-Type': 'application/json', 'Origin': 'app-morador' };
+  if (accounts[acct]?.token) headers['Authorization'] = 'Bearer ' + accounts[acct].token;
+  const opts = { method, headers };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  const data = await r.json().catch(() => null);
+  return { status: r.status, data };
+}
+
+async function doLogin(acct) {
+  const cpf = document.getElementById('cpf' + acct).value;
+  const senha = document.getElementById('senha' + acct).value;
+  const condo = parseInt(document.getElementById('condo' + acct).value);
+  const unid = document.getElementById('unid' + acct).value;
+
+  if (!cpf || !senha) { alert('Preencha CPF e senha'); return; }
+
+  const creds = btoa(cpf + ':' + senha);
+  try {
+    const r = await apiFetch('POST', API_ACCOUNTS + '/api/v1/login', null, 0);
+    // Need to pass auth header manually for login
+    const resp = await fetch(API_ACCOUNTS + '/api/v1/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Base ' + creds, 'Origin': 'app-morador' },
+    });
+    const data = await resp.json();
+
+    if (resp.status === 200 && data.token) {
+      accounts[acct] = { token: data.token, nome: data.nome, condo, unid };
+      document.getElementById('status' + acct).innerHTML = '✅ <b>' + data.nome + '</b> | Unidade: ' + unid;
+      if (acct === 1) setStatus('✅ ' + data.nome + ' | Unidade: ' + unid);
+    } else {
+      document.getElementById('status' + acct).innerHTML = '❌ ' + JSON.stringify(data);
+      if (acct === 1) setStatus('❌ Login falhou', false);
+    }
+  } catch (e) {
+    document.getElementById('status' + acct).innerHTML = '❌ Erro: ' + e.message;
+    setStatus('❌ Erro de conexão', false);
+  }
+}
+
+async function loadAreas() {
+  const acct = parseInt(document.getElementById('area-account').value);
+  const a = accounts[acct];
+  if (!a?.token) { alert('Faça login na conta ' + acct + ' primeiro'); return; }
+
+  const r = await apiFetch('GET', API_MORADOR + '/api/v1/areas?codigoCondominio=' + a.condo, null, acct);
+  if (r.status !== 200) { document.getElementById('areas-list').innerHTML = '<p>Erro: ' + JSON.stringify(r.data) + '</p>'; return; }
+
+  const tipos = {};
+  r.data.forEach(a => {
+    const t = a.tipoArea?.descricao || 'Outros';
+    if (!tipos[t]) tipos[t] = [];
+    tipos[t].push(a);
+  });
+
+  let html = '<table><tr><th>Cód</th><th>Espaço</th><th></th></tr>';
+  Object.keys(tipos).sort().forEach(tipo => {
+    html += '<tr><td colspan="3" style="color:#38bdf8;font-weight:600;padding-top:14px">── ' + tipo + ' ──</td></tr>';
+    tipos[tipo].sort((a, b) => (a.codigoArea || 0) - (b.codigoArea || 0)).forEach(a => {
+      const cod = a.codigoArea || a.codigo;
+      const nome = (a.nomeArea || a.descricao || '').trim();
+      html += '<tr><td>' + cod + '</td><td>' + nome + '</td>';
+      html += '<td><button class="btn btn-sm" onclick="selectArea(' + cod + ')">Selecionar</button></td></tr>';
+    });
+  });
+  html += '</table>';
+  document.getElementById('areas-list').innerHTML = html;
+}
+
+function selectArea(cod) {
+  ['h-area', 's-area'].forEach(id => document.getElementById(id).value = cod);
+}
+
+async function loadSlots() {
+  const area = document.getElementById('h-area').value;
+  const data = document.getElementById('h-data').value;
+  const acct = parseInt(document.getElementById('h-account').value);
+  if (!area || !data) { alert('Preencha área e data'); return; }
+  if (!accounts[acct]?.token) { alert('Faça login na conta ' + acct); return; }
+
+  const a = accounts[acct];
+  const unid = encodeURIComponent(a.unid);
+  const url = API_MORADOR + '/api/v1/areas/' + area + '/datasDisponiveis?codigoCondominio=' + a.condo + '&unidade=' + unid + '&dataInicial=' + data + 'T00:00:00&dataFinal=' + data + 'T23:59:00';
+  const r = await apiFetch('GET', url, null, acct);
+
+  if (r.status === 400) {
+    const msg = Array.isArray(r.data) ? r.data[0] : JSON.stringify(r.data);
+    document.getElementById('slots-list').innerHTML = '<p style="color:#ef4444;margin-top:12px">⚠️ ' + msg + '</p><p class="help">💡 Troque pra Conta 2 se tiver reserva ativa bloqueando.</p>';
+    return;
+  }
+
+  const slots = [];
+  (r.data?.datas || []).forEach(d => (d.periodos || []).forEach(p => slots.push(p)));
+
+  if (!slots.length) {
+    document.getElementById('slots-list').innerHTML = '<p style="margin-top:12px">❌ Sem horários disponíveis</p>';
+    return;
+  }
+
+  let html = '<table><tr><th>#</th><th>Início</th><th>Fim</th><th>Vagas</th><th></th></tr>';
+  slots.forEach((s, i) => {
+    const ini = s.dataInicio.substring(11, 16);
+    const fim = s.dataTermino.substring(11, 16);
+    const badge = s.quantidadeDeVagas > 0 ? '<span class="badge badge-ok">✅ ' + s.quantidadeDeVagas + '</span>' : '<span class="badge badge-no">❌ 0</span>';
+    html += '<tr><td>' + (i + 1) + '</td><td>' + ini + '</td><td>' + fim + '</td><td>' + badge + '</td>';
+    html += '<td><button class="btn btn-sm" onclick="fillSniper(' + area + ',\'' + data + '\',\'' + ini + '\')">🎯 Sniper</button></td></tr>';
+  });
+  html += '</table>';
+  document.getElementById('slots-list').innerHTML = html;
+}
+
+function fillSniper(area, data, hora) {
+  document.getElementById('s-area').value = area;
+  document.getElementById('s-data').value = data;
+  document.getElementById('s-hora').value = hora;
+  document.querySelectorAll('.tab')[3].click();
+}
+
+function startSniper() {
+  const area = parseInt(document.getElementById('s-area').value);
+  const data = document.getElementById('s-data').value;
+  const hora = document.getElementById('s-hora').value;
+  const disparo = document.getElementById('s-disparo').value;
+  const acct = parseInt(document.getElementById('s-account').value);
+  if (!area || !data || !hora || !disparo) { alert('Preencha todos'); return; }
+  if (!accounts[acct]?.token) { alert('Faça login na conta ' + acct); return; }
+
+  const [hd, md] = disparo.split(':').map(Number);
+  const log = document.getElementById('sniper-log');
+  const display = document.getElementById('sniper-display');
+  const statusEl = document.getElementById('sniper-status');
+
+  document.getElementById('sniper-btn').style.display = 'none';
+  document.getElementById('sniper-stop').style.display = 'inline-block';
+
+  log.innerHTML = '';
+  sLog('🎯 Sniper ativado — Área ' + area + ' | ' + data + ' ' + hora, 'info');
+  sLog('⏰ Disparo às ' + disparo + ':00 | Conta ' + acct, 'info');
+  statusEl.textContent = '⏳ Aguardando...';
+  display.style.color = '#38bdf8';
+
+  let relogged = false;
+  let fired = false;
+
+  sniperInterval = setInterval(async () => {
+    if (fired) return;
+    const now = new Date();
+    const target = new Date();
+    target.setHours(hd, md, 0, 0);
+    if (target <= new Date(now.getTime() - 500)) target.setDate(target.getDate() + 1);
+
+    const diff = (target - now) / 1000;
+
+    if (diff <= 0) {
+      fired = true;
+      display.style.color = '#22c55e';
+      display.textContent = '🚀 GO!';
+      statusEl.textContent = 'Disparando...';
+
+      // Re-login pra token fresco
+      const cpf = document.getElementById('cpf' + acct).value;
+      const senha = document.getElementById('senha' + acct).value;
+      if (cpf && senha) {
+        const creds = btoa(cpf + ':' + senha);
+        const lr = await fetch(API_ACCOUNTS + '/api/v1/login', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Base ' + creds, 'Origin': 'app-morador' }
+        });
+        const ld = await lr.json();
+        if (lr.status === 200) { accounts[acct].token = ld.token; sLog('🔄 Token renovado!', 'info'); }
+      }
+
+      const inicio = data + 'T' + hora.padStart(5, '0') + ':00';
+      const hh = parseInt(hora.split(':')[0]);
+      const mm = parseInt(hora.split(':')[1] || 0);
+      const fim = data + 'T' + String(hh + 1).padStart(2, '0') + ':' + String(mm).padStart(2, '0') + ':00';
+      const a = accounts[acct];
+
+      for (let i = 1; i <= 10; i++) {
+        const ts = new Date().toLocaleTimeString('pt-BR', { hour12: false, fractionalSecondDigits: 3 });
+        const r = await apiFetch('POST', API_MORADOR + '/api/v1/reservas', {
+          codigoArea: area, codigoCondominio: a.condo, unidade: a.unid,
+          quantPessoas: 1, dataReserva: [{ dataInicial: inicio, dataFinal: fim }], observacoes: ''
+        }, acct);
+
+        if (r.status === 200) {
+          sLog('[' + ts + '] ✅ RESERVA CONFIRMADA! Código: ' + (r.data?.codigoReserva || '?'), 'ok');
+          statusEl.textContent = '✅ RESERVA CONFIRMADA!';
+          display.textContent = '✅';
+          stopSniper();
+          return;
+        }
+        const msg = Array.isArray(r.data) ? r.data[0] : JSON.stringify(r.data);
+        sLog('[' + ts + '] Tentativa ' + i + ': ' + msg, 'err');
+
+        if (msg.includes('não está disponível')) {
+          statusEl.textContent = '💀 Já pegaram!';
+          display.textContent = '💀';
+          display.style.color = '#ef4444';
+          stopSniper();
+          return;
+        }
+        await new Promise(r => setTimeout(r, 20));
+      }
+      statusEl.textContent = '💀 Falhou';
+      stopSniper();
+      return;
+    }
+
+    // Countdown
+    const h = Math.floor(diff / 3600);
+    const m = Math.floor((diff % 3600) / 60);
+    const s = Math.floor(diff % 60);
+    display.textContent = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+
+    if (diff <= 5 && !relogged) {
+      relogged = true;
+      display.style.color = '#ef4444';
+      sLog('⚡ 5 segundos!', 'warn');
+    }
+  }, 100);
+}
+
+function sLog(msg, type) {
+  const log = document.getElementById('sniper-log');
+  log.innerHTML += '<div class="log-' + type + '">' + msg + '</div>';
+  log.scrollTop = log.scrollHeight;
+}
+
+function stopSniper() {
+  if (sniperInterval) { clearInterval(sniperInterval); sniperInterval = null; }
+  document.getElementById('sniper-btn').style.display = 'inline-block';
+  document.getElementById('sniper-stop').style.display = 'none';
+}
+
+async function loadMinhas() {
+  const acct = parseInt(document.getElementById('m-account').value);
+  if (!accounts[acct]?.token) { alert('Login primeiro'); return; }
+  const a = accounts[acct];
+  const r = await apiFetch('GET', API_MORADOR + '/api/v1/reservas', null, acct);
+  if (r.status !== 200) return;
+
+  const minhas = r.data.filter(x => x.condominio?.codigo === a.condo && x.unidade === a.unid && x.situacao?.codigo === 2);
+
+  if (!minhas.length) {
+    document.getElementById('minhas-list').innerHTML = '<p style="margin-top:12px">Nenhuma reserva ativa.</p>';
+    return;
+  }
+
+  let html = '<table><tr><th>Código</th><th>Espaço</th><th>Data</th><th>Horário</th><th>Solicitado em</th><th></th></tr>';
+  minhas.forEach(r => {
+    const area = (r.area?.descricao || '').trim();
+    const dt = r.dataInicial?.substring(0, 10) || '';
+    const ini = r.dataInicial?.substring(11, 16) || '';
+    const fim = r.dataFinal?.substring(11, 16) || '';
+    const sol = r.dataSolicitacao || '';
+    html += '<tr><td>' + r.codigoReserva + '</td><td>' + area + '</td><td>' + dt + '</td><td>' + ini + '-' + fim + '</td><td style="font-family:monospace;font-size:0.8em">' + sol + '</td>';
+    html += '<td><button class="btn btn-sm btn-danger" onclick="doCancelar(' + r.codigoReserva + ',' + acct + ')">Cancelar</button></td></tr>';
+  });
+  html += '</table>';
+  document.getElementById('minhas-list').innerHTML = html;
+}
+
+async function doCancelar(codigo, acct) {
+  if (!confirm('Cancelar reserva ' + codigo + '?')) return;
+  const r = await apiFetch('POST', API_MORADOR + '/api/v1/reservas/' + codigo + '/cancelar', { motivo: 'Aplicativo morador' }, acct);
+  if (r.status === 200) { alert('✅ Cancelada!'); loadMinhas(); }
+  else { alert('❌ ' + JSON.stringify(r.data)); }
+}
+
+async function loadEspiao() {
+  const data = document.getElementById('e-data').value;
+  const filtro = document.getElementById('e-area').value.toLowerCase();
+  const acct = parseInt(document.getElementById('e-account').value);
+  if (!data) { alert('Escolha uma data'); return; }
+  if (!accounts[acct]?.token) { alert('Login primeiro'); return; }
+
+  document.getElementById('espiao-list').innerHTML = '<p>⏳ Carregando todas as reservas...</p>';
+  const a = accounts[acct];
+  const r = await apiFetch('GET', API_MORADOR + '/api/v1/reservas', null, acct);
+  if (r.status !== 200) { document.getElementById('espiao-list').innerHTML = '<p>Erro</p>'; return; }
+
+  let reservas = r.data.filter(x =>
+    x.condominio?.codigo === a.condo &&
+    (x.dataInicial || '').startsWith(data)
+  );
+
+  if (filtro) {
+    reservas = reservas.filter(x => (x.area?.descricao || '').toLowerCase().includes(filtro));
+  }
+
+  reservas.sort((a, b) => (a.dataSolicitacao || '').localeCompare(b.dataSolicitacao || ''));
+
+  if (!reservas.length) {
+    document.getElementById('espiao-list').innerHTML = '<p style="margin-top:12px">Nenhuma reserva encontrada.</p>';
+    return;
+  }
+
+  let html = '<table><tr><th>Solicitado em</th><th>Área</th><th>Horário</th><th>Nome</th><th>Unid</th></tr>';
+  reservas.forEach(r => {
+    const sol = r.dataSolicitacao || '?';
+    const area = (r.area?.descricao || '').trim();
+    const ini = (r.dataInicial || '').substring(11, 16);
+    const fim = (r.dataFinal || '').substring(11, 16);
+    const nome = r.nome || '?';
+
+    // Highlight se reservou nos primeiros 30s após meia-noite
+    let badge = '';
+    if (sol.length >= 19) {
+      const h = parseInt(sol.substring(11, 13));
+      const m = parseInt(sol.substring(14, 16));
+      const s = parseInt(sol.substring(17, 19));
+      if (h === 0 && m === 0 && s <= 30) badge = ' <span class="badge badge-fast">⚡ SPEED</span>';
+      else if (h === 0 && m <= 1) badge = ' <span class="badge badge-fast">🏎️ RÁPIDO</span>';
+    }
+
+    html += '<tr><td style="font-family:monospace;font-size:0.8em;white-space:nowrap">' + sol + badge + '</td>';
+    html += '<td>' + area + '</td><td>' + ini + '-' + fim + '</td>';
+    html += '<td>' + nome + '</td><td>' + r.unidade + '</td></tr>';
+  });
+  html += '</table>';
+
+  // Estatísticas
+  const rapidos = reservas.filter(r => {
+    const sol = r.dataSolicitacao || '';
+    if (sol.length < 19) return false;
+    const h = parseInt(sol.substring(11, 13));
+    const m = parseInt(sol.substring(14, 16));
+    return h === 0 && m <= 1;
+  });
+
+  if (rapidos.length > 0) {
+    html += '<div style="margin-top:16px;padding:12px;background:#0f172a;border-radius:8px">';
+    html += '<b style="color:#f59e0b">🏎️ ' + rapidos.length + ' reservas nos primeiros 60 segundos!</b>';
+    const primeiro = rapidos[0]?.dataSolicitacao || '';
+    html += '<br><span class="help">Mais rápido: ' + primeiro + '</span>';
+    html += '</div>';
+  }
+
+  document.getElementById('espiao-list').innerHTML = html;
+}
+
+// Defaults
+document.addEventListener('DOMContentLoaded', () => {
+  const d = new Date(); d.setDate(d.getDate() + 7);
+  const ds = d.toISOString().split('T')[0];
+  document.getElementById('h-data').value = ds;
+  document.getElementById('s-data').value = ds;
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+  document.getElementById('e-data').value = tomorrow.toISOString().split('T')[0];
+});
+</script>
+</body>
+</html>
