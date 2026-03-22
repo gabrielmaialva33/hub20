@@ -17,6 +17,24 @@
 
 ---
 
+> [!CAUTION]
+> **DISCLAIMER — USO POR SUA CONTA E RISCO**
+>
+> Este projeto é disponibilizado **exclusivamente para fins educacionais e de pesquisa de segurança**.
+> O autor **NÃO se responsabiliza** por qualquer uso indevido, dano, acesso não autorizado,
+> violação de termos de serviço, ou qualquer consequência legal decorrente do uso desta ferramenta.
+>
+> - Todos os CPFs, nomes, placas e dados pessoais exibidos neste repositório são **fictícios/anonimizados**.
+> - O uso desta ferramenta contra sistemas sem **autorização explícita** do proprietário pode violar
+>   o [Art. 154-A do Código Penal Brasileiro](http://www.planalto.gov.br/ccivil_03/decreto-lei/del2848compilado.htm)
+>   (invasão de dispositivo informático) e outras legislações aplicáveis.
+> - **Você é inteiramente responsável** por como utiliza este código.
+>
+> Ao clonar, baixar ou utilizar qualquer parte deste projeto, você concorda que o autor não possui
+> qualquer responsabilidade sobre suas ações.
+
+---
+
 > [!IMPORTANT]
 > **Isto é uma ferramenta de automação pessoal.** Interage com a API do Hub 2.0 (Hubert)
 > para reservar espaços de condomínio de forma direta — sem o app lento, sem crash à meia-noite,
@@ -126,14 +144,14 @@ Edite `accounts.json` com suas credenciais:
     "label": "Principal",
     "cpf": "000.000.000-00",
     "senha": "sua_senha",
-    "condominio": 2078,
+    "condominio": 1234,
     "unidade": "3 083"
   },
   {
     "label": "Consulta",
     "cpf": "111.111.111-11",
     "senha": "outra_senha",
-    "condominio": 2078,
+    "condominio": 1234,
     "unidade": "3 083"
   }
 ]
@@ -203,7 +221,7 @@ O que acontece:
 ```
   🎯 MODO SNIPER ATIVADO
   📍 Area 17 | 📅 2026-04-03 20:00
-  👤 Principal (Marlon)
+  👤 Principal (Usuario)
   ⏰ Disparo as 00:00:00
 
   ⏱️  00:00:03
@@ -298,24 +316,24 @@ Acessa dados de **qualquer condomínio** da plataforma — moradores com CPF, RG
 python3 auto_booking.py --recon
 
 # Recon de OUTRO condomínio (IDOR)
-python3 auto_booking.py --recon --condo 2079
+python3 auto_booking.py --recon --condo 5678
 ```
 
 ```
-  🔍 RECON — Condominio 2079
+  🔍 RECON — Condominio 5678
 
   👥 Moradores (liberacaoAcesso)
 
      #  Nome                                 CPF             RG            Unidade   Tipo
-     1  FLAVIA ROZEANE DA SILVA              08598934488                   5 263     Funcionario
-     2  GABRIEL TEIXEIRA SILVA               30858480883      323980077    4 174     Morador
+     1  MARIA APARECIDA DOS SANTOS           00011122233                   5 263     Funcionario
+     2  JOAO CARLOS OLIVEIRA                 44455566677      123456789    4 174     Morador
   ...
   Total: 17 moradores
 
   🚗 Veiculos (portaria)
 
      #  Placa       Dono                            Unidade   Tipo
-     1  DHY1H43     ANDRE MONTES GUTIERREZ LAGUNA   3 043     Carro
+     1  ABC1D23     JOSE PEREIRA DA SILVA           3 043     Carro
   ...
   Total: 8 veiculos
 ```
@@ -365,9 +383,9 @@ python3 auto_booking.py --dump
 
   🏢 Top condominios por reservas:
 
-    467  ██████████████████████ 2078 - CONDOMINIO PAULISTANO
-    385  █████████████████ 2646 - COND ALTTO VILA MADALENA
-    202  █████████ 1378 - ASSOC BOSQUE DOS JATOBAS
+    467  ██████████████████████ 1001 - CONDOMINIO EXEMPLO ALPHA
+    385  █████████████████ 1002 - COND RESIDENCIAL BETA
+    202  █████████ 1003 - ASSOC MORADORES GAMMA
   ...
 ```
 
@@ -511,7 +529,7 @@ python3 server.py    # inicia proxy em :8080
 ```json
 {
   "codigoArea": 17,
-  "codigoCondominio": 2078,
+  "codigoCondominio": 1234,
   "unidade": "3 083",
   "quantPessoas": 1,
   "dataReserva": [

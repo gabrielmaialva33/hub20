@@ -1,6 +1,10 @@
 # Credentials
 accounts.json
 
+# Sensitive data dumps
+recon/
+dump/
+
 # Rust
 hub20-cli/target/
 

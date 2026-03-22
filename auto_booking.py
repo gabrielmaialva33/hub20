@@ -1236,10 +1236,10 @@ def gerenciar_contas(accounts: list[Account]) -> list[Account]:
         op = input("  > ").strip().upper()
 
         if op == "A":
-            label = input("  Label (ex: Marlon, Esposa): ").strip()
+            label = input("  Label (ex: Principal, Esposa): ").strip()
             cpf = input("  CPF: ").strip()
             senha = input("  Senha: ").strip()
-            condo = int(input("  Condominio [2078]: ").strip() or "2078")
+            condo = int(input("  Condominio: ").strip() or "0")
             unid = input("  Unidade: ").strip()
             accounts.append(
                 Account(
@@ -1508,10 +1508,10 @@ def main() -> None:
     if not accounts:
         print(f"  {Y}Nenhuma conta em {CONFIG_PATH}{RST}")
         print(f"  {DIM}Criando config inicial...{RST}\n")
-        label = input("  Label (ex: Marlon): ").strip() or "Principal"
+        label = input("  Label (ex: Principal): ").strip() or "Principal"
         cpf = input("  CPF: ").strip()
         senha = input("  Senha: ").strip()
-        condo = int(input("  Condominio [2078]: ").strip() or "2078")
+        condo = int(input("  Condominio: ").strip() or "0")
         unid = input("  Unidade: ").strip()
         accounts = [
             Account(

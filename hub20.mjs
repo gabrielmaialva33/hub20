@@ -373,7 +373,7 @@ async function menu(accounts) {
         const label = await ask('  Label: ');
         const cpf = await ask('  CPF: ');
         const senha = await ask('  Senha: ');
-        const condo = parseInt(await ask('  Condominio [2078]: ') || '2078');
+        const condo = parseInt(await ask('  Condominio: ') || '0');
         const unid = await ask('  Unidade: ');
         const a = new Account({ label, cpf, senha, condominio: condo, unidade: unid });
         if (await a.login()) {

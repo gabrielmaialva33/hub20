@@ -1107,7 +1107,7 @@ fn main() {
         println!("  {}", "Criando config inicial...".dimmed());
 
         let label: String = Input::new()
-            .with_prompt("  Label (ex: Marlon)")
+            .with_prompt("  Label (ex: Principal)")
             .default("Principal".to_string())
             .interact_text()
             .unwrap_or_default();
